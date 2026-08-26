@@ -8,7 +8,7 @@
 
 #include "mex.h"
 #ifdef _WIN32
-#include "C:\nrn\include\neuronapi.h"
+#include "neuronapi.h"
 #else
 #include "/usr/local/include/neuronapi.h"
 #endif
