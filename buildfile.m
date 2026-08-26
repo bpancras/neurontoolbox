@@ -10,7 +10,7 @@ plan("clean") = CleanTask;
 % Build the neuron_api MEX file from C++ source
 cppSource = ["source/neuron_api.cpp"];
 mexOptions = ["COMPFLAGS=$COMPFLAGS /std:c++17"...
-    "-Iinclude\"];
+    "-Isource\include\"];
 plan("mex") = MexTask.forEachFile(cppSource, "toolbox/", ...
     Options=mexOptions);
 end
