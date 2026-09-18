@@ -7,11 +7,7 @@
 #endif
 
 #include "mex.h"
-#ifdef _WIN32
 #include "neuronapi.h"
-#else
-#include "/usr/local/include/neuronapi.h"
-#endif
 #include <stdio.h>
 #include <array>
 #include <tuple>
@@ -1467,7 +1463,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         #ifndef _WIN32
         // Load the wrapper library first, with RTLD_GLOBAL so modl_reg and any
         // other symbols it defines are visible when libnrniv is loaded next.
-        DLL_HANDLE wrapper_handle = DLL_LOAD_GLOBAL("libmodlreg.dylib");
+        DLL_HANDLE wrapper_handle = DLL_LOAD_GLOBAL("libmodelreg.so");
         if (!wrapper_handle) {
             mexErrMsgIdAndTxt("load_neuron:loadFailure", "Failed to load libmodlreg.dylib: %s", DLL_ERROR());
             return;
@@ -1476,7 +1472,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     
         // Load the NEURON library next
         #ifndef _WIN32
-        neuron_handle = DLL_LOAD("/usr/local/lib/libnrniv.dylib");
+        neuron_handle = DLL_LOAD("libnrniv.dylib");
         #else
         neuron_handle = DLL_LOAD("c:\\nrn\\bin\\libnrniv.dll");
         #endif
