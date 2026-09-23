@@ -2,13 +2,14 @@
 // mex CXXFLAGS="-std=c++17" source/neuron_api.cpp
 
 #ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN
-    #define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #endif
 
 #include "mex.h"
 #include "neuronapi.h"
 #include <stdio.h>
+#include <unistd.h>
 #include <array>
 #include <tuple>
 #include <unordered_map>
@@ -17,25 +18,27 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <dlfcn.h>
+
 
 
 #ifdef _WIN32
-    #include <windows.h>
-    #define DLL_HANDLE HMODULE
-    #define DLL_LOAD(name) LoadLibrary(name)
-    #define DLL_GET_PROC(handle, name) GetProcAddress(handle, name)
-    #define DLL_FREE(handle) FreeLibrary(handle)
-    #define DLL_ERROR() "Error loading library"
+#include <windows.h>
+#define DLL_HANDLE HMODULE
+#define DLL_LOAD(name) LoadLibrary(name)
+#define DLL_GET_PROC(handle, name) GetProcAddress(handle, name)
+#define DLL_FREE(handle) FreeLibrary(handle)
+#define DLL_ERROR() "Error loading library"
 #else
-    #include <dlfcn.h>
-    #define DLL_HANDLE void*
-    #define DLL_LOAD(name) dlopen(name, RTLD_NOW)
-    // RTLD_GLOBAL promotes the library's symbols into the global namespace so
-    // that subsequently dlopen'd libraries (e.g. libnrniv) can resolve them.
-    #define DLL_LOAD_GLOBAL(name) dlopen(name, RTLD_NOW | RTLD_GLOBAL)
-    #define DLL_GET_PROC(handle, name) dlsym(handle, name)
-    #define DLL_FREE(handle) dlclose(handle)
-    #define DLL_ERROR() dlerror()
+#include <dlfcn.h>
+#define DLL_HANDLE void*
+#define DLL_LOAD(name) dlopen(name, RTLD_NOW)
+// RTLD_GLOBAL promotes the library's symbols into the global namespace so
+// that subsequently dlopen'd libraries (e.g. libnrniv) can resolve them.
+#define DLL_LOAD_GLOBAL(name) dlopen(name, RTLD_NOW | RTLD_GLOBAL)
+#define DLL_GET_PROC(handle, name) dlsym(handle, name)
+#define DLL_FREE(handle) dlclose(handle)
+#define DLL_ERROR() dlerror()
 #endif
 
 
@@ -241,7 +244,7 @@ struct NrnRef {
 
 template <typename... Args>
 std::tuple<Args...> extractParams(const mxArray* prhs[], int offset) {
-    return {}; 
+    return {};
 }
 
 
@@ -268,7 +271,7 @@ std::tuple<std::string, int> extractParams<std::string, int>(const mxArray* prhs
     return {
         getStringFromMxArray(prhs[offset]),
         static_cast<int>(mxGetScalar(prhs[offset+1]))
-    };
+        };
 }
 
 
@@ -364,7 +367,7 @@ void nrn_vector_nrnref(const mxArray* prhs[], mxArray* plhs[]) {
     plhs[0] = mxCreateNumericMatrix(1, 1, mxUINT64_CLASS, mxREAL);
     *(uint64_t*)mxGetData(plhs[0]) = reinterpret_cast<uint64_t>(ref);
 
-} 
+}
 
 void nrn_rangevar_nrnref(const mxArray* prhs[], mxArray* plhs[]) {
     // Get the range variable name, section, and x value from the arguments
@@ -695,7 +698,7 @@ void nrn_str_push(const mxArray* prhs[], mxArray* plhs[]) {
     // Two cases:
     // Case 1: nrn_str_push(value) - no string stack, use old static method
     // Case 2: nrn_str_push(string_stack, value) - use string stack
-    
+
     if (prhs[1] == nullptr || mxGetNumberOfElements(prhs[1]) != 1 || !mxIsUint64(prhs[1])) {
         // Case 1: use simple static approach
         static char* str = nullptr;
@@ -705,29 +708,29 @@ void nrn_str_push(const mxArray* prhs[], mxArray* plhs[]) {
         nrn_str_push_(&str);
         return;
     }
-    
+
     // Case 2: use string stack
     auto* stack = reinterpret_cast<std::vector<char*>*>(
         *((uint64_t*)mxGetData(prhs[1])));
 
     // Create new string for each push
     std::string temp_str = getStringFromMxArray(prhs[2]);
-    
+
     // Allocate memory
     char* str = new char[temp_str.length() + 1];
     std::strcpy(str, temp_str.c_str());
-    
+
     // Reserve enough space
     if (stack->capacity() < stack->size() + 1) {
         stack->reserve(stack->size() + 20);
     }
-    
+
     // Add to stack to keep alive
     stack->push_back(str);
-    
+
     // Get index of element
     size_t index = stack->size() - 1;
-    
+
     // Pass pointer to element at this index
     nrn_str_push_(&((*stack)[index]));
 }
@@ -848,7 +851,7 @@ void nrn_section_diam_set(const mxArray* prhs[], mxArray* plhs[]) {
     nrn_section_pop_();
     if (n3d > 0) {
         mexErrMsgIdAndTxt("nrn_section_diam_set:Pt3dError",
-            "Use pt3dclear() to clear 3D points before changing the diameter of the Section.");
+                          "Use pt3dclear() to clear 3D points before changing the diameter of the Section.");
     }
 
     int nseg = nrn_nseg_get_(sec);
@@ -992,7 +995,7 @@ std::vector<double> get_section_plot_data(Section* sec, ShapePlotInterface* spi)
             // Otherwise, get the value of the specified variable
             seg_value = nrn_rangevar_get_(nrn_symbol_(varname), sec, x);
         }
-        
+
         // Do one initial run
         result.push_back(interpolate_arrays(arcs, xs, segment_arc[0]));
         result.push_back(interpolate_arrays(arcs, xs, segment_arc[1]));
@@ -1069,7 +1072,7 @@ void nrn_loop_sections(const mxArray* prhs[], mxArray* plhs[]) {
 
     while (!nrn_sectionlist_iterator_done_(sli)) {
         Section* sec = nrn_sectionlist_iterator_next_(sli);
-        
+
         section_pointers.push_back(reinterpret_cast<uint64_t>(sec));
     }
 
@@ -1095,7 +1098,7 @@ void nrnref_get_name(const mxArray* prhs[], mxArray* plhs[]) {
     NrnRef* ref = reinterpret_cast<NrnRef*>(ref_ptr);
 
     if (ref->ref_class == NrnRef::RefClass::Vector) {
-            // For Vectors, call label function to get the name
+        // For Vectors, call label function to get the name
         int returnval = nrn_method_call_nothrow_(ref->obj, nrn_method_symbol_(ref->obj, "label"), 0, error_buffer, sizeof(error_buffer));
         if (returnval) {
             mexErrMsgIdAndTxt("neuron_api:exception", "nrnref_get_name failed: %s\n", error_buffer);
@@ -1191,7 +1194,7 @@ void nrn_rangevar_set(const mxArray* prhs[], mxArray* plhs[]) {
         nrn_section_pop_();
         if (n3d > 0) {
             mexErrMsgIdAndTxt("nrn_rangevar_set:Pt3dError",
-                "Use pt3dclear() to clear 3D points before changing the diameter of the Segment.");
+                              "Use pt3dclear() to clear 3D points before changing the diameter of the Segment.");
         }
     }
 
@@ -1338,7 +1341,7 @@ void nrnref_symbol_set(const mxArray* prhs[], mxArray* plhs[]) {
     }
     double* dataptr = nrn_symbol_dataptr_(ref->sym);
     *(dataptr + index) = value;
-}  
+}
 
 void nrnref_vector_get(const mxArray* prhs[], mxArray* plhs[]) {
     auto ref_ptr = static_cast<uint64_t>(mxGetScalar(prhs[1]));
@@ -1451,7 +1454,7 @@ void nrn_distance(const mxArray* prhs[], mxArray* plhs[]) {
     double x0 = mxGetScalar(prhs[2]);
     auto sec1_ptr = static_cast<uint64_t>(mxGetScalar(prhs[3]));
     Section* sec1 = reinterpret_cast<Section*>(sec1_ptr);
-    double x1 = mxGetScalar(prhs[4]);    
+    double x1 = mxGetScalar(prhs[4]);
     double dist = nrn_distance_(sec0, x0, sec1, x1);
     plhs[0] = mxCreateDoubleScalar(dist);
 }
@@ -1459,20 +1462,30 @@ void nrn_distance(const mxArray* prhs[], mxArray* plhs[]) {
 
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
+    Dl_info info;
+    dladdr(reinterpret_cast<void*>(&mexFunction), &info);
+    std::string mexPath(info.dli_fname);
+    mexPath = mexPath.substr(0, mexPath.find_last_of('/'));
+    std::string soPath = mexPath + "/nrn/lib/libnrniv.so";
+    std::string libmodelPath = mexPath + "/libmodelreg.so";
+    // const char* cstr = soPath.c_str();
+
     if (!neuron_handle) {
         #ifndef _WIN32
         // Load the wrapper library first, with RTLD_GLOBAL so modl_reg and any
         // other symbols it defines are visible when libnrniv is loaded next.
-        DLL_HANDLE wrapper_handle = DLL_LOAD_GLOBAL("libmodelreg.so");
+        // DLL_HANDLE wrapper_handle = DLL_LOAD_GLOBAL("/mathworks/home/bpancras/gitRepo/neurontoolbox/toolbox/libmodelreg.so");
+        DLL_HANDLE wrapper_handle = DLL_LOAD_GLOBAL(libmodelPath.c_str());
         if (!wrapper_handle) {
-            mexErrMsgIdAndTxt("load_neuron:loadFailure", "Failed to load libmodlreg.dylib: %s", DLL_ERROR());
+            // mexErrMsgIdAndTxt("load_neuron:loadFailure", "1.Failed to load libmodlreg.dylib: %s", DLL_ERROR());
+            mexErrMsgIdAndTxt("load_neuron:loadFailure", "1.Failed to load libmodlreg.dylib: %s", libmodelPath.c_str());
             return;
         }
         #endif
-    
+
         // Load the NEURON library next
         #ifndef _WIN32
-        neuron_handle = DLL_LOAD("libnrniv.dylib");
+        neuron_handle = DLL_LOAD(soPath.c_str());
         #else
         neuron_handle = DLL_LOAD("c:\\nrn\\bin\\libnrniv.dll");
         #endif
@@ -1482,10 +1495,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
             //DLL_FREE(neuron_handle);
             return;
         }
-    
+
         static std::array<const char*, 4> argv = {"NEURON", "-nogui", "-nopython", nullptr};
         auto nrn_init = (int (*)(int, const char**)) DLL_GET_PROC(neuron_handle, "nrn_init");
-    
+
         if (nrn_init) {
             nrn_init(3, argv.data());
         } else {
@@ -1494,7 +1507,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
             //DLL_FREE(neuron_handle);
             return;
         }
-    
+
         auto nrn_stdout_redirect = (void (*)(int (*)(int, char*))) DLL_GET_PROC(neuron_handle, "nrn_stdout_redirect");
         if (nrn_stdout_redirect) {
             nrn_stdout_redirect(mlprint);
@@ -1650,13 +1663,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         function_map["nrn_symbol_nrnref"] = nrn_symbol_nrnref;
         function_map["nrnref_get_name"] = nrnref_get_name;
         function_map["nrnref_get_class"] = nrnref_get_class;
-        function_map["nrnref_symbol_get"] = nrnref_symbol_get;        
+        function_map["nrnref_symbol_get"] = nrnref_symbol_get;
         function_map["nrnref_symbol_set"] = nrnref_symbol_set;
         function_map["nrn_vector_nrnref"] = nrn_vector_nrnref;
-        function_map["nrnref_vector_get"] = nrnref_vector_get; 
-        function_map["nrnref_vector_set"] = nrnref_vector_set; 
-        function_map["nrn_rangevar_nrnref"] = nrn_rangevar_nrnref;   
-        function_map["nrnref_symbol_push"] = nrnref_symbol_push;     
+        function_map["nrnref_vector_get"] = nrnref_vector_get;
+        function_map["nrnref_vector_set"] = nrnref_vector_set;
+        function_map["nrn_rangevar_nrnref"] = nrn_rangevar_nrnref;
+        function_map["nrnref_symbol_push"] = nrnref_symbol_push;
         function_map["nrnref_rangevar_get"] = nrnref_rangevar_get;
         function_map["nrnref_rangevar_set"] = nrnref_rangevar_set;
         function_map["nrnref_property_get"] = nrnref_property_get;
@@ -1683,12 +1696,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         function_map["nrn_reset_string_stack"] = nrn_reset_string_stack;
 
         if (!nrn_cas_) {
-             mexErrMsgIdAndTxt("NEURON:OutdatedAPI",
-                               "nrn_cas not found; update NEURON");
+            mexErrMsgIdAndTxt("NEURON:OutdatedAPI",
+                              "nrn_cas not found; update NEURON");
         }
         if (!nrn_prop_exists_) {
-             mexErrMsgIdAndTxt("NEURON:OutdatedAPI",
-                               "nrn_prop_exists not found; update NEURON");
+            mexErrMsgIdAndTxt("NEURON:OutdatedAPI",
+                              "nrn_prop_exists not found; update NEURON");
         }
 
         // Clean up
@@ -1697,7 +1710,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     }
     if (nrhs) {
         std::string name = getStringFromMxArray(prhs[0]);
-        
+
         auto item = function_map.find(name);
         if (item != function_map.end()) {
             // call it
