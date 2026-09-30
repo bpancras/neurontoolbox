@@ -27,32 +27,28 @@ end
 
 function downloadNeuronTask(~)
 % Download and extract the NEURON wheel package (Linux only)
-%
-% Fetches the manylinux NEURON wheel and unpacks its runtime files
-% (bin, include, lib, share) into toolbox/nrn/. A wheel is a zip archive
-% whose payload lives under "<dist>.data/data/".
 
 if ~strcmp(computer("arch"), "glnxa64")
     error("downloadNeuron:UnsupportedPlatform", ...
         "This task only supports Linux (glnxa64); detected '%s'.", ...
         computer("arch"));
 end
-
+% Change this URL for different versions of Neuron
 wheelUrl = "https://github.com/neuronsimulator/nrn/releases/download/" + ...
     "msvc-wheel-dev/neuron_nightly-9.0.2.dev298-cp314-cp314-" + ...
     "manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl";
 
 destDir = fullfile("toolbox", "nrn");
-tmpDir = "temp";
-mkdir(tmpDir);
-cleanup = onCleanup(@() rmdir(tmpDir, "s"));
+nrnExtractDir = "temp";
+mkdir(nrnExtractDir);
+cleanup = onCleanup(@() rmdir(nrnExtractDir, "s"));
 
 % Wheels use the .whl extension but unzip requires a .zip name.
-wheelFile = fullfile(tmpDir, "neuron.zip");
+wheelFile = fullfile(nrnExtractDir, "neuron.zip");
 fprintf("Downloading NEURON wheel...\n");
 websave(wheelFile, wheelUrl);
 
-extractDir = fullfile(tmpDir, "extracted");
+extractDir = fullfile(nrnExtractDir, "extracted");
 unzip(wheelFile, extractDir);
 
 % Locate the "<dist>.data/data" directory that holds bin/include/lib/share.
