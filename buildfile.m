@@ -15,7 +15,7 @@ plan("mex") = MexTask.forEachFile(cppSource, "toolbox/", ...
     Options=mexOptions);
 
 % The mex task needs the NEURON headers/libs from the wheel.
-plan("mex").Dependencies = "downloadNeuron";
+plan("mex").Dependencies = ["downloadNeuron", "libmodelreg"];
 end
 
 
