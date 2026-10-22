@@ -23,9 +23,6 @@
                 </Category>
             </Info>
         </File>
-        <File Location="c91662.CNG.swc">
-            <Info/>
-        </File>
         <File Location="install.bat">
             <Info/>
         </File>
