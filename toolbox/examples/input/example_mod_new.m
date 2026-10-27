@@ -1,19 +1,15 @@
-% Initialize neuron session
+%% Initialize neuron session
 n = neuron.launch();
 n.reset_sections();
 filePath = mfilename("fullpath");
-neuron.nrnivmodl(fullfile(fileparts(filePath), "mod", "*.mod"));
 
-% Hardcoding the mod file path
-% modPath_nmdanet = fullfile(fileparts(filePath), "mod", "nmdanet.mod");
-% modPath_h = fullfile(fileparts(filePath), "mod", "h.mod");
-% neuron.nrnivmodl([modPath_nmdanet, modPath_h]);
+%% Trans-compile the mod files
+mechLibPath = neuron.nrnivmodl(fullfile(fileparts(filePath), "mod", "*.mod"));
 
-dllPath = fullfile("/home/bpancras/gitRepo/neurontoolbox/examples/x86_64/libnrnmech.so");
-
+%% Load the mechanism file
 try
     % Also for linux and mac use nrn_load_dll
-    n.nrn_load_dll(dllPath);
+    n.nrn_load_dll(mechLibPath);
 catch
     warning("Could not load shared library file; is it already loaded?");
 end
