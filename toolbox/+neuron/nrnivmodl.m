@@ -53,7 +53,7 @@ end
 fprintf(" => Mod files to build:\n")
 i = 1;
 for f = files
-    fprintf("   %d. %s \n", i, f);
+    fprintf("    %d. %s \n", i, f);
     i = i+1;
 end
 
@@ -68,7 +68,7 @@ else
     modSubDir = fullfile(options.OutputFolder, "x86_64");
 end
 if ~isfolder(modSubDir)
-    fprintf("Creating '%s' directory for .o files.\n\n", modSubDir);
+    fprintf(" => Creating '%s' directory for .o files.\n", modSubDir);
     mkdir(modSubDir);
 end
 % Resolve to an absolute path so the returned library path is absolute.

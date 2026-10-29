@@ -94,6 +94,7 @@ end
 
 mechLib = fullfile(buildDir, "libnrnmech.so");
 mechLibTmp = mechLib + ".tmp";
+fprintf(" => Compiling mod files \n");
 try
     % Rules from makemod2c_inc: mod -> cpp -> o.
     objs = strings(0, 1);
@@ -103,7 +104,7 @@ try
         cppFile = fullfile(buildDir, baseName + ".cpp");
         objFile = fullfile(buildDir, baseName + ".o");
 
-        fprintf(" => NMODL %s\n", modFile);
+        fprintf("    -> NMODL %s\n", modFile);
         % nocmodl resolves relative INCLUDEs against the mod file's folder.
         cmd = "MODLUNIT=" + q(nrnUnits) + " " + q(nocmodl) + " " + q(modFile) + ...
             " -o " + q(buildDir);
@@ -111,7 +112,7 @@ try
         if (status ~= 0)
             error("Neuron Toolbox: command failed:\n%s\n%s", cmd, output);
         end
-        fprintf(" => Compiling %s\n", cppFile);
+        fprintf("    -> Compiling %s\n", cppFile);
         cmd = cxxCompile + " -I" + q(modDir) + " " + includes + " -fPIC -c " + ...
             q(cppFile) + " -o " + q(objFile);
         [status, output] = system(cmd);
@@ -123,7 +124,7 @@ try
     for i = 1:numel(options.CFiles)
         [cDir, cName, cExt] = fileparts(options.CFiles(i));
         objFile = fullfile(buildDir, cName + cExt + ".o");
-        fprintf(" => Compiling %s\n", options.CFiles(i));
+        fprintf("    -> Compiling %s\n", options.CFiles(i));
         cmd = cCompile + " -I" + q(cDir) + " " + includes + " -fPIC -c " + ...
             q(options.CFiles(i)) + " -o " + q(objFile);
         [status, output] = system(cmd);

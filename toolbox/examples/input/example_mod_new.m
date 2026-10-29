@@ -4,7 +4,7 @@ n.reset_sections();
 filePath = mfilename("fullpath");
 
 %% Trans-compile the mod files
-mechLibPath = neuron.nrnivmodl(fullfile(fileparts(filePath), "mod", "*.mod"));
+mechLibPath = neuron.nrnivmodl(fullfile(fileparts(filePath), "mod", "*.mod"), OutputFolder="tmp");
 
 %% Load the mechanism file
 try
