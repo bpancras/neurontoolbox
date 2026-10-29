@@ -1,4 +1,4 @@
-function [mechLib, special] = nrnmech_makefile(target, options)
+function [mechLib, special] = nrnmech_makefile(options)
 % Build a NEURON mechanism library from mod files.
 %   [mechLib, special] = neuron.nrnmech_makefile()
 %   [mechLib, special] = neuron.nrnmech_makefile(target, ModFiles=files, ...)
@@ -13,12 +13,11 @@ function [mechLib, special] = nrnmech_makefile(target, options)
 %   IncludeFlags   extra compiler flags (UserINCFLAGS)
 %   LoadFlags      extra linker flags (UserLDFLAGS)
 %   LinkCoreNEURON link against libcorenrnmech (LinkCoreNEURON)
-%   DestDir        install destination for the "install" target (DESTDIR)
 % Like make, mod files and objects are only rebuilt when out of date;
 % mod_func.o, the shared library and special are always rebuilt. The
 % NEURON installation (ROOT) is taken from NRNHOME.
 arguments
-    target (1,1) string {mustBeMember(target, ["special", "mechlib", "install"])} = "special"
+    % target (1,1) string {mustBeMember(target, ["special", "mechlib", "install"])} = "special"
     options.ModFiles string = string.empty
     options.ModFolder string {mustBeFolder} = string.empty
     options.CFiles string = string.empty
@@ -26,16 +25,15 @@ arguments
     options.IncludeFlags (1,1) string = ""
     options.LoadFlags (1,1) string = ""
     options.LinkCoreNEURON (1,1) logical = false
-    options.DestDir (1,1) string = ""
 end
 
 NRNRoot = string(getenv("NRNHOME"));
 if NRNRoot == ""
     error("Neuron Toolbox: NRNHOME is not set; call neuron.launch() first.");
 end
-if target == "install" && options.DestDir == ""
-    error("Neuron Toolbox: the install target requires DestDir.");
-end
+% if target == "install" && options.DestDir == ""
+%     error("Neuron Toolbox: the install target requires DestDir.");
+% end
 
 % Install dirs.
 binDir = fullfile(NRNRoot, "bin");
@@ -93,24 +91,19 @@ else
     origin = "$ORIGIN";
     soname = "-Wl,-soname,libnrnmech.so";
 end
-destDirRpath = origin;
-if options.DestDir ~= ""
-    destDirRpath = fullfile(options.DestDir, "lib");
-end
 
-% Rules from makemod2c_inc: mod -> cpp -> o.
-objs = strings(0, 1);
-for i = 1:numel(modFiles)
-    modFile = modFiles(i);
-    [modDir, baseName] = fileparts(modFile);
-    cppFile = fullfile(buildDir, baseName + ".cpp");
-    objFile = fullfile(buildDir, baseName + ".o");
-    % Like make, rebuild a target that is missing or older than its sources.
-    modInfo = dir(modFile);
-    nocmodlInfo = dir(nocmodl);
-    cppInfo = dir(cppFile);
-    if isempty(cppInfo) || cppInfo.datenum < max([modInfo.datenum, nocmodlInfo.datenum])
-        fprintf(" -> NMODL %s\n", modFile);
+mechLib = fullfile(buildDir, "libnrnmech.so");
+mechLibTmp = mechLib + ".tmp";
+try
+    % Rules from makemod2c_inc: mod -> cpp -> o.
+    objs = strings(0, 1);
+    for i = 1:numel(modFiles)
+        modFile = modFiles(i);
+        [modDir, baseName] = fileparts(modFile);
+        cppFile = fullfile(buildDir, baseName + ".cpp");
+        objFile = fullfile(buildDir, baseName + ".o");
+
+        fprintf(" => NMODL %s\n", modFile);
         % nocmodl resolves relative INCLUDEs against the mod file's folder.
         cmd = "MODLUNIT=" + q(nrnUnits) + " " + q(nocmodl) + " " + q(modFile) + ...
             " -o " + q(buildDir);
@@ -118,10 +111,6 @@ for i = 1:numel(modFiles)
         if (status ~= 0)
             error("Neuron Toolbox: command failed:\n%s\n%s", cmd, output);
         end
-        cppInfo = dir(cppFile);
-    end
-    objInfo = dir(objFile);
-    if isempty(objInfo) || objInfo.datenum < cppInfo.datenum
         fprintf(" => Compiling %s\n", cppFile);
         cmd = cxxCompile + " -I" + q(modDir) + " " + includes + " -fPIC -c " + ...
             q(cppFile) + " -o " + q(objFile);
@@ -129,73 +118,52 @@ for i = 1:numel(modFiles)
         if (status ~= 0)
             error("Neuron Toolbox: command failed:\n%s\n%s", cmd, output);
         end
+        objs(end+1, 1) = q(objFile); %#ok<AGROW>
     end
-    objs(end+1, 1) = q(objFile); %#ok<AGROW>
-end
-for i = 1:numel(options.CFiles)
-    [cDir, cName, cExt] = fileparts(options.CFiles(i));
-    objFile = fullfile(buildDir, cName + cExt + ".o");
-    cInfo = dir(options.CFiles(i));
-    objInfo = dir(objFile);
-    if isempty(objInfo) || (~isempty(cInfo) && objInfo.datenum < cInfo.datenum)
-        fprintf(" -> Compiling %s\n", options.CFiles(i));
+    for i = 1:numel(options.CFiles)
+        [cDir, cName, cExt] = fileparts(options.CFiles(i));
+        objFile = fullfile(buildDir, cName + cExt + ".o");
+        fprintf(" => Compiling %s\n", options.CFiles(i));
         cmd = cCompile + " -I" + q(cDir) + " " + includes + " -fPIC -c " + ...
             q(options.CFiles(i)) + " -o " + q(objFile);
         [status, output] = system(cmd);
-        assert(status == 0, "Neuron Toolbox: command failed:\n%s\n%s", cmd, output);
-    end
-    objs(end+1, 1) = q(objFile); %#ok<AGROW>
-end
-
-% mod_func.o: mod_func.cpp. Always rebuilt since nrnivmodl regenerates
-% mod_func.cpp on every call and file times only have 1 s resolution.
-modFuncCpp = fullfile(buildDir, "mod_func.cpp");
-modFuncObj = fullfile(buildDir, "mod_func.o");
-if ~isfile(modFuncCpp)
-    error("Neuron Toolbox: mod_func.cpp not found in %s.", buildDir);
-end
-fprintf(" => Compiling mod_func.cpp\n");
-cmd = cxxCompile + " " + includes + " -fPIC -c " + q(modFuncCpp) + " -o " + q(modFuncObj);
-[status, output] = system(cmd);
-assert(status == 0, "Neuron Toolbox: command failed:\n%s\n%s", cmd, output);
-
-% mech_lib_shared (build_always). The .tmp output avoids nvc++ error:
-% input file 'libnrnmech.so' is the same as output file.
-mechLib = fullfile(buildDir, "libnrnmech.so");
-mechLibTmp = mechLib + ".tmp";
-fprintf(" => LINKING shared library ""%s""\n", mechLib);
-cmd = cxxLinkShared + " -I" + q(incDir) + " -o " + q(mechLibTmp) + " " + soname + ...
-    " " + q(modFuncObj) + " " + join([objs; ""], " ") + nrnLibFlags + " " + nrnLibRpathFlags + ...
-    " " + ldFlags;
-[status, output] = system(cmd);
-assert(status == 0, "Neuron Toolbox: command failed:\n%s\n%s", cmd, output);
-movefile(mechLibTmp, mechLib, "f");
-
-% special: take the main and link with nrnmech. RPATH is set for
-% destDirRpath and the NEURON lib folder.
-special = fullfile(buildDir, "special");
-if target ~= "mechlib"
-    fprintf(" => LINKING executable ""%s"" LDFLAGS are: %s\n", special, ldFlags);
-    cmd = cxxLinkExe + " -I" + q(incDir) + " -I" + q(fullfile(incDir, "nrncvode")) + ...
-        " -DAUTO_DLOPEN_NRNMECH=0 " + q(fullfile(dataDir, "nrnmain.cpp")) + ...
-        " -o " + q(special) + " -L" + q(buildDir) + " -lnrnmech " + nrnLibFlags + " -lnrnmech" + ...
-        " -Wl,-rpath,'" + destDirRpath + "' " + nrnLibRpathFlags + " " + ldFlags + ...
-        " " + extraLdFlags;
-    [status, output] = system(cmd);
-    assert(status == 0, "Neuron Toolbox: command failed:\n%s\n%s", cmd, output);
-end
-
-% install: copy the library and special into DestDir.
-if target == "install"
-    for sub = ["bin", "lib"]
-        if ~isfolder(fullfile(options.DestDir, sub))
-            mkdir(fullfile(options.DestDir, sub));
+        if (status ~= 0)
+            error("Neuron Toolbox: command failed:\n%s\n%s", cmd, output);
         end
+        objs(end+1, 1) = q(objFile); %#ok<AGROW>
     end
-    copyfile(mechLib, fullfile(options.DestDir, "lib"), "f");
-    copyfile(special, fullfile(options.DestDir, "bin"), "f");
-    mechLib = fullfile(options.DestDir, "lib", "libnrnmech.so");
-    special = fullfile(options.DestDir, "bin", "special");
+
+    % mod_func.o: mod_func.cpp. Always rebuilt since nrnivmodl regenerates
+    % mod_func.cpp on every call and file times only have 1 s resolution.
+    modFuncCpp = fullfile(buildDir, "mod_func.cpp");
+    modFuncObj = fullfile(buildDir, "mod_func.o");
+    if ~isfile(modFuncCpp)
+        error("Neuron Toolbox: mod_func.cpp not found in %s.", buildDir);
+    end
+    fprintf(" => Compiling mod_func.cpp\n");
+    cmd = cxxCompile + " " + includes + " -fPIC -c " + q(modFuncCpp) + " -o " + q(modFuncObj);
+    [status, output] = system(cmd);
+    if (status ~= 0)
+        error("Neuron Toolbox: command failed:\n%s\n%s", cmd, output);
+    end
+
+    % mech_lib_shared (build_always). The .tmp output avoids nvc++ error:
+    % input file 'libnrnmech.so' is the same as output file.
+    fprintf(" => LINKING shared library ""%s""\n", mechLib);
+    cmd = cxxLinkShared + " -I" + q(incDir) + " -o " + q(mechLibTmp) + " " + soname + ...
+        " " + q(modFuncObj) + " " + join([objs; ""], " ") + nrnLibFlags + " " + nrnLibRpathFlags + ...
+        " " + ldFlags;
+    [status, output] = system(cmd);
+    if (status ~= 0)
+        error("Neuron Toolbox: command failed:\n%s\n%s", cmd, output);
+    end
+    movefile(mechLibTmp, mechLib, "f");
+catch ME
+    % Remove a partially linked library before passing the error on.
+    if isfile(mechLibTmp)
+        delete(mechLibTmp);
+    end
+    rethrow(ME);
 end
 end
 

@@ -95,10 +95,10 @@ src = ["#include <stdio.h>"
 writelines(src, fullfile(modSubDir, "mod_func.cpp"));
 
 %% Build the mechanism shared library.
-mechLib = neuron.nrnmech_makefile("mechlib" , ModFiles=files, CFiles=cFiles, ...
+mechLib = neuron.nrnmech_makefile(ModFiles=files, CFiles=cFiles, ...
     BuildFolder=modSubDir, IncludeFlags=options.IncludeFlags, ...
     LoadFlags=options.LoadFlags);
-fprintf("Successfully created %s\n", mechLib);
+fprintf(" => Successfully created %s\n", mechLib);
 end
 
 function matches = matchFiles(f)
